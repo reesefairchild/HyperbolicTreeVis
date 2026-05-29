@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: sans-serif; background: transparent; padding: 0; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 4px 0;
+}
+
+@media (max-width: 700px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.panel { display: flex; flex-direction: column; gap: 6px; }
+
+.step-label {
+  font-size: 11px;
+  color: #888780;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.3;
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f1efe8;
+  border: 0.5px solid #b4b2a9;
+  font-size: 10px;
+  font-weight: 500;
+  color: #5f5e5a;
+  flex-shrink: 0;
+}
+
+canvas {
+  display: block;
+  border-radius: 6px;
+  border: 0.5px solid rgba(0,0,0,0.1);
+  width: 100%;
+  height: auto;
+}
+
+.caption {
+  font-size: 11px;
+  color: #888780;
+  line-height: 1.45;
+}
+
+.btn-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+button {
+  padding: 4px 10px;
+  font-size: 11px;
+  border: 0.5px solid #b4b2a9;
+  border-radius: 5px;
+  background: transparent;
+  color: #444441;
+  cursor: pointer;
+  font-family: sans-serif;
+}
+button:hover { background: #f1efe8; }
+button:disabled { opacity: 0.35; cursor: default; }
+
+.t-val {
+  font-size: 10px;
+  color: #888780;
+  font-family: monospace;
+}
+</style>
+</head>
+<body>
+
+<div class="grid">
+
+  <div class="panel">
+    <div class="step-label"><span class="step-num">1</span> Original graph</div>
+    <canvas id="c1" width="200" height="200"></canvas>
+    <p class="caption">A 7-node tree in the Poincaré disk. Node <strong style="color:#993C1D">B</strong> is our target.</p>
+  </div>
+
+  <div class="panel">
+    <div class="step-label"><span class="step-num">2</span> Identify <em>a</em></div>
+    <canvas id="c2" width="200" height="200"></canvas>
+    <p class="caption">Node <strong style="color:#993C1D">B</strong> is marked as <em>a</em>. The geodesic through it is shown.</p>
+  </div>
+
+  <div class="panel">
+    <div class="step-label"><span class="step-num">3</span> Apply f</div>
+    <canvas id="c3" width="200" height="200"></canvas>
+    <div class="btn-row">
+      <button id="playBtn">Play</button>
+      <button id="resetBtn">Reset</button>
+      <span class="t-val" id="tval">t = 0.00</span>
+    </div>
+    <p class="caption">Each node moves to f<sub>a</sub>(z) = (z−a)/(1−āz). Angles preserved.</p>
+  </div>
+
+  <div class="panel">
+    <div class="step-label"><span class="step-num">4</span> Result</div>
+    <canvas id="c4" width="200" height="200"></canvas>
+    <p class="caption">Node <strong style="color:#993C1D">B</strong> is now at the origin. Hyperbolic distances unchanged.</p>
+  </div>
+
+</div>
+
+<script>
+(function(){
+
+const DPR = window.devicePixelRatio || 1;
+const S = 200, CX = S/2, CY = S/2, R = 82;
+
+// Scale every canvas for the screen's pixel density
+document.querySelectorAll('canvas').forEach(c => {
+  c.width  = S * DPR;
+  c.height = S * DPR;
+  c.style.width  = S + 'px';
+  c.style.height = S + 'px';
+  c.getContext('2d').scale(DPR, DPR);
+});
+
+const NODES = [
+  { id:'A', hx: 0,     hy: 0     },
+  { id:'B', hx: 0.48,  hy: 0.30  },
+  { id:'C', hx:-0.45,  hy: 0.28  },
+  { id:'D', hx:-0.12,  hy:-0.52  },
+  { id:'E', hx: 0.70,  hy: 0.55  },
+  { id:'F', hx: 0.68,  hy: 0.05  },
+  { id:'G', hx:-0.62,  hy: 0.55  },
+];
+const EDGES = [['A','B'],['A','C'],['A','D'],['B','E'],['B','F'],['C','G']];
+const TARGET = 'B';
+
+function mob(zx,zy,ax,ay){
+  const nx=zx-ax, ny=zy-ay;
+  const dx=1-ax*zx-ay*zy, dy=ay*zx-ax*zy;
+  const d2=dx*dx+dy*dy;
+  if(d2<1e-12) return [0,0];
+  return [(nx*dx+ny*dy)/d2,(ny*dx-nx*dy)/d2];
+}
+
+function lerpH(ax,ay,bx,by,t){
+  const x=ax+(bx-ax)*t, y=ay+(by-ay)*t;
+  const l=Math.hypot(x,y);
+  if(l>=0.9999) return [x/l*0.9999,y/l*0.9999];
+  return [x,y];
+}
+
+function tc(hx,hy){ return [CX+hx*R, CY+hy*R]; }
+
+function disk(ctx){
+  ctx.beginPath(); ctx.arc(CX,CY,R,0,2*Math.PI);
+  ctx.fillStyle='#f3f6fa'; ctx.fill();
+  ctx.strokeStyle='#cfd8e3'; ctx.lineWidth=1; ctx.stroke();
+  [0.33,0.60,0.82].forEach(r=>{
+    ctx.beginPath(); ctx.arc(CX,CY,R*r,0,2*Math.PI);
+    ctx.strokeStyle='rgba(0,0,0,0.05)'; ctx.lineWidth=0.5; ctx.stroke();
+  });
+}
+
+function edges(ctx, nodes){
+  ctx.save(); ctx.beginPath(); ctx.arc(CX,CY,R,0,2*Math.PI); ctx.clip();
+  EDGES.forEach(([ai,bi])=>{
+    const a=nodes.find(n=>n.id===ai), b=nodes.find(n=>n.id===bi); if(!a||!b) return;
+    const [ax,ay]=tc(a.hx,a.hy), [bx,by]=tc(b.hx,b.hy);
+    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by);
+    ctx.strokeStyle='rgba(60,58,52,0.2)'; ctx.lineWidth=0.9; ctx.stroke();
+  });
+  ctx.restore();
+}
+
+function nodeR(id){ return id==='a'?7:id===TARGET?6.5:5; }
+
+function drawNodes(ctx, nodes, opts){
+  opts = opts||{};
+  ctx.save(); ctx.beginPath(); ctx.arc(CX,CY,R,0,2*Math.PI); ctx.clip();
+
+  if(opts.geodesic){
+    const n=nodes.find(n=>n.id===TARGET);
+    if(n){
+      const ext=R/Math.max(Math.hypot(n.hx,n.hy),0.001);
+      ctx.setLineDash([3,3]);
+      ctx.beginPath();
+      ctx.moveTo(CX-n.hx*ext, CY-n.hy*ext);
+      ctx.lineTo(CX+n.hx*ext, CY+n.hy*ext);
+      ctx.strokeStyle='rgba(83,74,183,0.3)'; ctx.lineWidth=0.7; ctx.stroke();
+      ctx.setLineDash([]);
+      const [sx,sy]=tc(n.hx,n.hy);
+      ctx.beginPath(); ctx.arc(sx,sy,13,0,2*Math.PI);
+      ctx.fillStyle='rgba(153,60,29,0.12)'; ctx.fill();
+    }
+  }
+
+  nodes.forEach(n=>{
+    const [sx,sy]=tc(n.hx,n.hy);
+    const nr=nodeR(n.id);
+    const isTgt=n.id===TARGET;
+    ctx.beginPath(); ctx.arc(sx,sy,nr,0,2*Math.PI);
+    ctx.fillStyle   = isTgt ? '#993C1D' : '#534AB7';
+    ctx.strokeStyle = isTgt ? '#F0997B' : '#AFA9EC';
+    ctx.lineWidth=0.8; ctx.fill(); ctx.stroke();
+    ctx.font='500 9px sans-serif'; ctx.textAlign='center';
+    const tw=ctx.measureText(n.id).width;
+    const lx=sx, ly=sy+nr+2;
+    ctx.fillStyle='rgba(255,255,255,0.88)';
+    ctx.beginPath(); ctx.roundRect(lx-tw/2-2,ly,tw+4,11,2); ctx.fill();
+    ctx.fillStyle='#2c2c2a'; ctx.fillText(n.id,lx,ly+9);
+  });
+  ctx.restore();
+}
+
+function draw1(){
+  const ctx=document.getElementById('c1').getContext('2d');
+  ctx.clearRect(0,0,S,S); disk(ctx); edges(ctx,NODES); drawNodes(ctx,NODES);
+}
+
+function draw2(){
+  const ctx=document.getElementById('c2').getContext('2d');
+  ctx.clearRect(0,0,S,S); disk(ctx);
+  ctx.beginPath(); ctx.arc(CX,CY,5,0,2*Math.PI);
+  ctx.fillStyle='rgba(83,74,183,0.15)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(CX,CY,12,0,2*Math.PI);
+  ctx.strokeStyle='rgba(83,74,183,0.2)'; ctx.lineWidth=0.8;
+  ctx.setLineDash([2,2]); ctx.stroke(); ctx.setLineDash([]);
+  edges(ctx,NODES);
+  drawNodes(ctx,NODES,{geodesic:true});
+  const tgt=NODES.find(n=>n.id===TARGET);
+  const [sx,sy]=tc(tgt.hx,tgt.hy);
+}
+
+let animT=0, raf=null, playing=false;
+
+function nodesAt(t){
+  const tgt=NODES.find(n=>n.id===TARGET);
+  const ease=t<0.5?2*t*t:-2*t*t+4*t-1;
+  return NODES.map(n=>{
+    const [fx,fy]=mob(n.hx,n.hy,tgt.hx,tgt.hy);
+    const [ix,iy]=lerpH(n.hx,n.hy,fx,fy,ease);
+    return {...n,hx:ix,hy:iy};
+  });
+}
+
+function draw3(t){
+  const ctx=document.getElementById('c3').getContext('2d');
+  ctx.clearRect(0,0,S,S); disk(ctx);
+  const cur=nodesAt(t); edges(ctx,cur); drawNodes(ctx,cur);
+  document.getElementById('tval').textContent='t = '+t.toFixed(2);
+}
+
+function draw4(){
+  const ctx=document.getElementById('c4').getContext('2d');
+  ctx.clearRect(0,0,S,S); disk(ctx);
+  const tgt=NODES.find(n=>n.id===TARGET);
+  const final=NODES.map(n=>{
+    const [fx,fy]=mob(n.hx,n.hy,tgt.hx,tgt.hy);
+    return {...n,hx:fx,hy:fy};
+  });
+  edges(ctx,final); drawNodes(ctx,final);
+}
+
+document.getElementById('playBtn').addEventListener('click',()=>{
+  if(playing) return; playing=true;
+  document.getElementById('playBtn').disabled=true;
+  (function step(){
+    animT=Math.min(animT+0.018,1); draw3(animT);
+    if(animT<1) raf=requestAnimationFrame(step);
+    else { playing=false; document.getElementById('playBtn').disabled=false; }
+  })();
+});
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  cancelAnimationFrame(raf); playing=false; animT=0;
+  document.getElementById('playBtn').disabled=false; draw3(0);
+});
+
+draw1(); draw2(); draw3(0); draw4();
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS Topics — Poincaré Disk</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: sans-serif; background: #f5f4ef; padding: 16px; }
+#poincare-wrap { position:relative; width:100%; max-width:700px; margin:0 auto; }
+#poincare-canvas { display:block; width:100%; border-radius:12px; cursor:grab; touch-action:none; background:#f5f4ef; }
+#poincare-tip { position:absolute; pointer-events:none; opacity:0; background:#fff; border:0.5px solid #ccc; border-radius:8px; padding:6px 10px; font-size:12px; color:#222; transition:opacity .12s; white-space:nowrap; z-index:9; }
+.legend-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+#legend { display:flex; flex-wrap:wrap; gap:8px 14px; padding:8px 0 4px; font-size:11px; color:#666; max-width:700px; margin:0 auto; }
+</style>
+</head>
+<body>
+
+<div id="poincare-wrap">
+  <canvas id="poincare-canvas"></canvas>
+  <div id="poincare-tip"></div>
+</div>
+<div id="legend"></div>
+
+<script>
+(function(){
+
+const COLORS = {
+  root:      {fill:'#2C2C2A', stroke:'#888780'},
+  field:     {fill:'#3C3489', stroke:'#AFA9EC'},
+  subfield:  {fill:'#185FA5', stroke:'#85B7EB'},
+  concept:   {fill:'#0F6E56', stroke:'#5DCAA5'},
+  algorithm: {fill:'#633806', stroke:'#EF9F27'},
+  language:  {fill:'#72243E', stroke:'#ED93B1'},
+  person:    {fill:'#993C1D', stroke:'#F0997B'},
+  problem:   {fill:'#A32D2D', stroke:'#F09595'},
+  tool:      {fill:'#5F5E5A', stroke:'#B4B2A9'},
+};
+function col(t){ return COLORS[t]||{fill:'#888780',stroke:'#ccc'}; }
+
+const legendEl = document.getElementById('legend');
+[
+  ['field','Field'],
+  ['subfield','Subfield'],
+  ['concept','Concept'],
+  ['algorithm','Algorithm'],
+  ['language','Language / Tool'],
+  ['person','Pioneer'],
+  ['problem','Open problem'],
+  ['tool','System / Standard'],
+].forEach(([t,l])=>{
+  const c=col(t);
+  legendEl.innerHTML+=`<span><span class="legend-dot" style="background:${c.fill};border:1px solid ${c.stroke}"></span>${l}</span>`;
+});
+
+const TREE = {id:'root',name:'Computer Science',type:'root',ch:[
+  {id:'algorithms',name:'Algorithms',type:'field',ch:[
+    {id:'sorting',name:'Sorting',type:'subfield',ch:[
+      {id:'quicksort',name:'Quicksort',type:'algorithm'},
+      {id:'mergesort',name:'Merge sort',type:'algorithm'},
+      {id:'heapsort',name:'Heap sort',type:'algorithm'},
+      {id:'radix',name:'Radix sort',type:'algorithm'},
+    ]},
+    {id:'graph_alg',name:'Graph algorithms',type:'subfield',ch:[
+      {id:'dijkstra',name:'Dijkstra',type:'algorithm'},
+      {id:'astar',name:'A*',type:'algorithm'},
+      {id:'bfs_dfs',name:'BFS / DFS',type:'algorithm'},
+      {id:'mst',name:'Min spanning tree',type:'algorithm'},
+      {id:'max_flow',name:'Max flow',type:'algorithm'},
+    ]},
+    {id:'dynamic_prog',name:'Dynamic programming',type:'subfield',ch:[
+      {id:'knapsack',name:'Knapsack',type:'problem'},
+      {id:'lcs',name:'LCS',type:'algorithm'},
+      {id:'edit_dist',name:'Edit distance',type:'algorithm'},
+    ]},
+    {id:'complexity',name:'Complexity theory',type:'subfield',ch:[
+      {id:'p_np',name:'P vs NP',type:'problem'},
+      {id:'np_complete',name:'NP-completeness',type:'concept'},
+      {id:'big_o',name:'Big-O notation',type:'concept'},
+      {id:'space_complex',name:'Space complexity',type:'concept'},
+      {id:'approx',name:'Approximation algs',type:'subfield'},
+    ]},
+    {id:'randomized',name:'Randomized algs',type:'subfield',ch:[
+      {id:'monte_carlo',name:'Monte Carlo',type:'algorithm'},
+      {id:'las_vegas',name:'Las Vegas',type:'algorithm'},
+      {id:'bloom',name:'Bloom filter',type:'tool'},
+    ]},
+  ]},
+  {id:'data_structures',name:'Data Structures',type:'field',ch:[
+    {id:'linear_ds',name:'Linear',type:'subfield',ch:[
+      {id:'array',name:'Arrays',type:'concept'},
+      {id:'linked_list',name:'Linked lists',type:'concept'},
+      {id:'stack_queue',name:'Stack / Queue',type:'concept'},
+      {id:'deque',name:'Deque',type:'concept'},
+    ]},
+    {id:'trees_ds',name:'Trees',type:'subfield',ch:[
+      {id:'bst',name:'Binary search tree',type:'concept'},
+      {id:'avl',name:'AVL tree',type:'concept'},
+      {id:'red_black',name:'Red-black tree',type:'concept'},
+      {id:'b_tree',name:'B-tree',type:'concept'},
+      {id:'trie',name:'Trie',type:'concept'},
+      {id:'segment_tree',name:'Segment tree',type:'concept'},
+    ]},
+    {id:'hash_ds',name:'Hash structures',type:'subfield',ch:[
+      {id:'hash_table',name:'Hash table',type:'concept'},
+      {id:'hash_map',name:'Hash map',type:'concept'},
+      {id:'consistent_hash',name:'Consistent hashing',type:'concept'},
+    ]},
+    {id:'heaps',name:'Heaps & Priority Qs',type:'subfield',ch:[
+      {id:'binary_heap',name:'Binary heap',type:'concept'},
+      {id:'fibonacci_heap',name:'Fibonacci heap',type:'concept'},
+    ]},
+    {id:'advanced_ds',name:'Advanced',type:'subfield',ch:[
+      {id:'skip_list',name:'Skip list',type:'concept'},
+      {id:'union_find',name:'Union-Find',type:'concept'},
+      {id:'lsm_tree',name:'LSM tree',type:'concept'},
+    ]},
+  ]},
+  {id:'systems',name:'Systems',type:'field',ch:[
+    {id:'os',name:'Operating Systems',type:'subfield',ch:[
+      {id:'scheduling',name:'Scheduling',type:'concept'},
+      {id:'virtual_mem',name:'Virtual memory',type:'concept'},
+      {id:'processes',name:'Processes & threads',type:'concept'},
+      {id:'ipc',name:'IPC',type:'concept'},
+      {id:'file_systems',name:'File systems',type:'subfield',ch:[
+        {id:'ext4',name:'ext4',type:'tool'},
+        {id:'ntfs',name:'NTFS',type:'tool'},
+        {id:'zfs',name:'ZFS',type:'tool'},
+      ]},
+    ]},
+    {id:'networking',name:'Networking',type:'subfield',ch:[
+      {id:'tcp_ip',name:'TCP/IP',type:'tool'},
+      {id:'http',name:'HTTP/3',type:'tool'},
+      {id:'dns',name:'DNS',type:'tool'},
+      {id:'bgp',name:'BGP',type:'tool'},
+      {id:'cdn',name:'CDN',type:'concept'},
+      {id:'sockets',name:'Sockets',type:'concept'},
+    ]},
+    {id:'distributed',name:'Distributed Systems',type:'subfield',ch:[
+      {id:'cap',name:'CAP theorem',type:'concept'},
+      {id:'consensus',name:'Consensus',type:'subfield',ch:[
+        {id:'paxos',name:'Paxos',type:'algorithm'},
+        {id:'raft',name:'Raft',type:'algorithm'},
+      ]},
+      {id:'eventual_consist',name:'Eventual consistency',type:'concept'},
+      {id:'mapreduce',name:'MapReduce',type:'algorithm'},
+      {id:'crdt',name:'CRDTs',type:'concept'},
+    ]},
+    {id:'databases',name:'Databases',type:'subfield',ch:[
+      {id:'relational',name:'Relational (SQL)',type:'subfield',ch:[
+        {id:'normalization',name:'Normalization',type:'concept'},
+        {id:'acid',name:'ACID',type:'concept'},
+        {id:'query_opt',name:'Query optimization',type:'concept'},
+      ]},
+      {id:'nosql',name:'NoSQL',type:'subfield',ch:[
+        {id:'doc_store',name:'Document store',type:'tool'},
+        {id:'kv_store',name:'Key-value store',type:'tool'},
+        {id:'col_store',name:'Columnar store',type:'tool'},
+        {id:'graph_db',name:'Graph DB',type:'tool'},
+      ]},
+      {id:'transactions',name:'Transactions',type:'concept'},
+      {id:'indexing',name:'Indexing',type:'concept'},
+    ]},
+    {id:'arch',name:'Computer Architecture',type:'subfield',ch:[
+      {id:'cpu',name:'CPU pipeline',type:'concept'},
+      {id:'cache',name:'Cache hierarchy',type:'concept'},
+      {id:'simd',name:'SIMD',type:'concept'},
+      {id:'gpu_arch',name:'GPU architecture',type:'concept'},
+      {id:'memory_model',name:'Memory models',type:'concept'},
+    ]},
+  ]},
+  {id:'pl',name:'Programming Languages',type:'field',ch:[
+    {id:'paradigms',name:'Paradigms',type:'subfield',ch:[
+      {id:'imperative',name:'Imperative',type:'concept'},
+      {id:'functional',name:'Functional',type:'concept'},
+      {id:'oop',name:'Object-oriented',type:'concept'},
+      {id:'logic_prog',name:'Logic programming',type:'concept'},
+      {id:'declarative',name:'Declarative',type:'concept'},
+    ]},
+    {id:'type_systems',name:'Type systems',type:'subfield',ch:[
+      {id:'static_types',name:'Static typing',type:'concept'},
+      {id:'type_inference',name:'Type inference',type:'concept'},
+      {id:'dependent_types',name:'Dependent types',type:'concept'},
+      {id:'polymorphism',name:'Polymorphism',type:'concept'},
+    ]},
+    {id:'compilers',name:'Compilers',type:'subfield',ch:[
+      {id:'lexing',name:'Lexing & parsing',type:'concept'},
+      {id:'ir',name:'Intermediate repr.',type:'concept'},
+      {id:'code_gen',name:'Code generation',type:'concept'},
+      {id:'jit',name:'JIT compilation',type:'concept'},
+      {id:'llvm',name:'LLVM',type:'tool'},
+    ]},
+    {id:'langs',name:'Notable languages',type:'subfield',ch:[
+      {id:'c_lang',name:'C',type:'language'},
+      {id:'lisp',name:'Lisp',type:'language'},
+      {id:'ml_lang',name:'ML',type:'language'},
+      {id:'haskell',name:'Haskell',type:'language'},
+      {id:'rust',name:'Rust',type:'language'},
+      {id:'python',name:'Python',type:'language'},
+    ]},
+    {id:'concurrency',name:'Concurrency',type:'subfield',ch:[
+      {id:'threads',name:'Threads & locks',type:'concept'},
+      {id:'actors',name:'Actor model',type:'concept'},
+      {id:'csp',name:'CSP',type:'concept'},
+      {id:'async_await',name:'Async / Await',type:'concept'},
+    ]},
+  ]},
+  {id:'ai_ml',name:'AI & Machine Learning',type:'field',ch:[
+    {id:'ml_core',name:'Machine Learning',type:'subfield',ch:[
+      {id:'supervised',name:'Supervised learning',type:'concept'},
+      {id:'unsupervised',name:'Unsupervised learning',type:'concept'},
+      {id:'reinforcement',name:'Reinforcement learning',type:'subfield',ch:[
+        {id:'q_learning',name:'Q-learning',type:'algorithm'},
+        {id:'policy_grad',name:'Policy gradient',type:'algorithm'},
+      ]},
+      {id:'bias_variance',name:'Bias-variance tradeoff',type:'concept'},
+    ]},
+    {id:'deep_learning',name:'Deep Learning',type:'subfield',ch:[
+      {id:'backprop',name:'Backpropagation',type:'algorithm'},
+      {id:'cnn',name:'CNNs',type:'concept'},
+      {id:'rnn',name:'RNNs / LSTMs',type:'concept'},
+      {id:'transformers',name:'Transformers',type:'concept',ch:[
+        {id:'attention',name:'Attention mechanism',type:'algorithm'},
+        {id:'llms',name:'Large language models',type:'concept'},
+      ]},
+      {id:'gans',name:'GANs',type:'concept'},
+      {id:'diffusion',name:'Diffusion models',type:'concept'},
+    ]},
+    {id:'classical_ai',name:'Classical AI',type:'subfield',ch:[
+      {id:'search_ai',name:'Search',type:'subfield',ch:[
+        {id:'minimax_ai',name:'Minimax',type:'algorithm'},
+        {id:'mcts',name:'MCTS',type:'algorithm'},
+      ]},
+      {id:'csp_ai',name:'Constraint satisfaction',type:'concept'},
+      {id:'bayesian',name:'Bayesian networks',type:'concept'},
+      {id:'expert_sys',name:'Expert systems',type:'concept'},
+    ]},
+    {id:'nlp',name:'NLP',type:'subfield',ch:[
+      {id:'tokenization',name:'Tokenization',type:'concept'},
+      {id:'embeddings',name:'Embeddings',type:'concept'},
+      {id:'parsing_nlp',name:'Parsing',type:'concept'},
+      {id:'ner',name:'Named entity recog.',type:'concept'},
+    ]},
+    {id:'cv',name:'Computer Vision',type:'subfield',ch:[
+      {id:'object_detect',name:'Object detection',type:'concept'},
+      {id:'segmentation',name:'Segmentation',type:'concept'},
+      {id:'optical_flow',name:'Optical flow',type:'concept'},
+    ]},
+  ]},
+  {id:'theory',name:'Theory of Computation',type:'field',ch:[
+    {id:'automata',name:'Automata theory',type:'subfield',ch:[
+      {id:'dfa',name:'DFAs / NFAs',type:'concept'},
+      {id:'pushdown',name:'Pushdown automata',type:'concept'},
+      {id:'turing_machine',name:'Turing machines',type:'concept'},
+      {id:'regex',name:'Regular expressions',type:'concept'},
+    ]},
+    {id:'formal_lang',name:'Formal languages',type:'subfield',ch:[
+      {id:'chomsky',name:'Chomsky hierarchy',type:'concept'},
+      {id:'cfg',name:'Context-free grammars',type:'concept'},
+      {id:'pumping',name:'Pumping lemma',type:'concept'},
+    ]},
+    {id:'computability',name:'Computability',type:'subfield',ch:[
+      {id:'halting',name:'Halting problem',type:'problem'},
+      {id:'reduction',name:'Reductions',type:'concept'},
+      {id:'rice',name:"Rice's theorem",type:'concept'},
+      {id:'turing_p',name:'Alan Turing',type:'person'},
+    ]},
+    {id:'information_theory',name:'Information Theory',type:'subfield',ch:[
+      {id:'entropy_it',name:'Entropy',type:'concept'},
+      {id:'channel_cap',name:'Channel capacity',type:'concept'},
+      {id:'compression',name:'Compression',type:'subfield',ch:[
+        {id:'huffman',name:'Huffman coding',type:'algorithm'},
+        {id:'lempel_ziv',name:'Lempel-Ziv',type:'algorithm'},
+      ]},
+      {id:'shannon_p',name:'Claude Shannon',type:'person'},
+    ]},
+  ]},
+  {id:'security',name:'Security',type:'field',ch:[
+    {id:'crypto',name:'Cryptography',type:'subfield',ch:[
+      {id:'symmetric',name:'Symmetric crypto',type:'subfield',ch:[
+        {id:'aes',name:'AES',type:'tool'},
+        {id:'chacha',name:'ChaCha20',type:'tool'},
+      ]},
+      {id:'asymmetric',name:'Asymmetric crypto',type:'subfield',ch:[
+        {id:'rsa',name:'RSA',type:'tool'},
+        {id:'ecc',name:'Elliptic curve crypto',type:'concept'},
+        {id:'dh',name:'Diffie-Hellman',type:'algorithm'},
+      ]},
+      {id:'hash_fn',name:'Hash functions',type:'concept',ch:[
+        {id:'sha',name:'SHA family',type:'tool'},
+        {id:'collision',name:'Collision resistance',type:'concept'},
+      ]},
+      {id:'zkp',name:'Zero-knowledge proofs',type:'concept'},
+      {id:'post_quantum',name:'Post-quantum crypto',type:'subfield'},
+    ]},
+    {id:'appsec',name:'Application security',type:'subfield',ch:[
+      {id:'sqli',name:'SQL injection',type:'concept'},
+      {id:'xss',name:'XSS',type:'concept'},
+      {id:'buffer_overflow',name:'Buffer overflow',type:'concept'},
+      {id:'tls',name:'TLS / PKI',type:'tool'},
+    ]},
+    {id:'formal_verify',name:'Formal verification',type:'subfield',ch:[
+      {id:'model_check',name:'Model checking',type:'concept'},
+      {id:'theorem_prov',name:'Theorem provers',type:'tool'},
+      {id:'sat_solver',name:'SAT solvers',type:'tool'},
+    ]},
+  ]},
+  {id:'hci_graphics',name:'HCI & Graphics',type:'field',ch:[
+    {id:'hci',name:'Human-Computer Interaction',type:'subfield',ch:[
+      {id:'ui_design',name:'UI design',type:'concept'},
+      {id:'accessibility',name:'Accessibility',type:'concept'},
+      {id:'usability',name:'Usability testing',type:'concept'},
+    ]},
+    {id:'graphics',name:'Computer Graphics',type:'subfield',ch:[
+      {id:'rasterization',name:'Rasterization',type:'concept'},
+      {id:'ray_tracing',name:'Ray tracing',type:'algorithm'},
+      {id:'shaders',name:'Shaders',type:'concept'},
+      {id:'rendering_pipe',name:'Rendering pipeline',type:'concept'},
+      {id:'opengl',name:'OpenGL / Vulkan',type:'tool'},
+    ]},
+    {id:'vr_ar',name:'VR / AR',type:'subfield',ch:[
+      {id:'slam',name:'SLAM',type:'algorithm'},
+      {id:'six_dof',name:'6DoF tracking',type:'concept'},
+    ]},
+  ]},
+]};
+
+const nodes = [];
+const edges = [];
+const byId  = {};
+
+function flatten(node, parent, depth){
+  const n = {id:node.id, name:node.name, type:node.type, depth, children:(node.ch||[]).map(c=>c.id), hx:0, hy:0};
+  nodes.push(n);
+  byId[n.id] = n;
+  if(parent) edges.push([parent, n.id]);
+  (node.ch||[]).forEach(c=>flatten(c, n.id, depth+1));
+}
+flatten(TREE, null, 0);
+
+function layout(id, startAngle, span){
+  const n = byId[id];
+  if(!n) return;
+  const kids = n.children;
+  if(!kids.length) return;
+  const step = span / kids.length;
+  kids.forEach((cid, i)=>{
+    const c = byId[cid];
+    const angle = startAngle + (i + 0.5)*step;
+    const r = 1 - Math.pow(0.55, c.depth);
+    c.hx = Math.min(r, 0.93) * Math.cos(angle);
+    c.hy = Math.min(r, 0.93) * Math.sin(angle);
+    layout(cid, angle - step*0.48, step*0.96);
+  });
+}
+byId['root'].hx = 0; byId['root'].hy = 0;
+layout('root', 0, 2*Math.PI);
+
+const canvas = document.getElementById('poincare-canvas');
+const ctx    = canvas.getContext('2d');
+const tip    = document.getElementById('poincare-tip');
+
+let W=600, H=600, R=260, ox=300, oy=300;
+let cx=0, cy=0, zoom=1;
+let hovered=null, selected=null;
+let dragOn=false, lmx=0, lmy=0;
+
+function setSize(){
+  const wrap = document.getElementById('poincare-wrap');
+  W = wrap.offsetWidth || 600;
+  H = W;
+  canvas.width = W; canvas.height = H;
+  canvas.style.height = H+'px';
+  R = W*0.44*zoom; ox = W/2; oy = H/2;
+}
+
+function mob(zx,zy,ax,ay){
+  const nx=zx-ax, ny=zy-ay;
+  const dx=1-ax*zx-ay*zy, dy=ay*zx-ax*zy;
+  const d2=dx*dx+dy*dy;
+  if(d2<1e-10) return [0,0];
+  return [(nx*dx+ny*dy)/d2,(ny*dx-nx*dy)/d2];
+}
+
+function proj(hx,hy){
+  const [x,y]=mob(hx,hy,cx,cy);
+  return [ox+x*R, oy+y*R];
+}
+
+function nodeR(n){
+  if(n.depth===0) return 14;
+  if(n.depth===1) return 10;
+  if(n.depth===2) return 7;
+  return 4.5;
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  ctx.beginPath(); ctx.arc(ox,oy,R+1,0,2*Math.PI);
+  ctx.fillStyle = '#f3f6fa';
+  ctx.strokeStyle = '#cfd8e3';
+  ctx.fill(); ctx.lineWidth=1; ctx.stroke();
+
+  ctx.save();
+  ctx.beginPath(); ctx.arc(ox,oy,R,0,2*Math.PI); ctx.clip();
+
+  [0.33,0.6,0.8,0.93].forEach(rr=>{
+    ctx.beginPath(); ctx.arc(ox,oy,R*rr,0,2*Math.PI);
+    ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+    ctx.lineWidth=0.5; ctx.stroke();
+  });
+
+  edges.forEach(([aid,bid])=>{
+    const a=byId[aid], b=byId[bid]; if(!a||!b) return;
+    const [px,py]=proj(a.hx,a.hy), [qx,qy]=proj(b.hx,b.hy);
+    ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(qx,qy);
+    ctx.strokeStyle = 'rgba(60,58,52,0.18)';
+    ctx.lineWidth=0.8; ctx.stroke();
+  });
+
+  [...nodes].sort((a,b)=>a.depth-b.depth).forEach(n=>{
+    const [px,py]=proj(n.hx,n.hy);
+    if(Math.hypot(px-ox,py-oy)>R+10) return;
+    const nr=nodeR(n), c=col(n.type);
+    const sel=selected===n.id, hov=hovered===n.id;
+    const boost=sel?3:hov?2:0;
+    if(sel){
+      ctx.beginPath(); ctx.arc(px,py,nr+7,0,2*Math.PI);
+      ctx.fillStyle=c.fill+'44'; ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(px,py,nr+boost,0,2*Math.PI);
+    ctx.fillStyle=c.fill; ctx.fill();
+    ctx.strokeStyle=c.stroke; ctx.lineWidth=sel?1.8:0.8; ctx.stroke();
+
+    if(n.depth<=2||hov||sel){
+      const lbl=n.name.length>18?n.name.slice(0,17)+'…':n.name;
+      const fs=Math.max(8,Math.min(11,nr*1.1));
+      ctx.font=`${n.depth<=1?500:400} ${fs}px sans-serif`;
+      ctx.textAlign='center';
+      const tw=ctx.measureText(lbl).width;
+      const lx=px, ly=py+nr+3;
+      ctx.fillStyle='rgba(255,255,255,0.82)';
+      ctx.beginPath(); ctx.roundRect(lx-tw/2-3,ly,tw+6,fs+3,3); ctx.fill();
+      ctx.fillStyle='#2c2c2a';
+      ctx.fillText(lbl,lx,ly+fs+1);
+    }
+  });
+  ctx.restore();
+}
+
+function hit(mx,my){
+  let best=null, bd=Infinity;
+  nodes.forEach(n=>{
+    const [px,py]=proj(n.hx,n.hy);
+    const d=Math.hypot(px-mx,py-my);
+    if(d<nodeR(n)+6&&d<bd){bd=d;best=n;}
+  });
+  return best;
+}
+
+function animTo(tx,ty){
+  const sx=cx,sy=cy; let step=0; const steps=22;
+  const iv=setInterval(()=>{
+    step++; const t=step/steps;
+    const e=t<0.5?2*t*t:-2*t*t+4*t-1;
+    cx=sx+(tx-sx)*e; cy=sy+(ty-sy)*e;
+    const l=Math.hypot(cx,cy);
+    if(l>0.93){cx*=0.93/l;cy*=0.93/l;}
+    R=W*0.44*zoom; draw();
+    if(step>=steps) clearInterval(iv);
+  },16);
+}
+
+canvas.addEventListener('mousedown',e=>{
+  dragOn=true; canvas.style.cursor='grabbing';
+  const r=canvas.getBoundingClientRect();
+  lmx=e.clientX-r.left; lmy=e.clientY-r.top;
+});
+canvas.addEventListener('mousemove',e=>{
+  const r=canvas.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  if(dragOn){
+    const dx=(mx-lmx)/R*0.72, dy=(my-lmy)/R*0.72;
+    const [nx,ny]=mob(-dx,-dy,cx,cy);
+    const l=Math.hypot(nx,ny);
+    cx=nx/Math.max(1,l/0.93); cy=ny/Math.max(1,l/0.93);
+    lmx=mx; lmy=my; draw();
+  } else {
+    const n=hit(mx,my), prev=hovered;
+    hovered=n?n.id:null;
+    if(hovered!==prev) draw();
+    if(n){
+      canvas.style.cursor='pointer';
+      tip.innerHTML=`<b>${n.name}</b><br><span style="color:#888;font-size:11px">${n.type.replace('_',' ')}${n.children.length?' · '+n.children.length+' subtopics':''}</span>`;
+      tip.style.left=(mx+14)+'px'; tip.style.top=(my-8)+'px'; tip.style.opacity='1';
+    } else {
+      canvas.style.cursor='grab'; tip.style.opacity='0';
+    }
+  }
+});
+canvas.addEventListener('mouseup',e=>{
+  dragOn=false; canvas.style.cursor='grab';
+  const r=canvas.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  const n=hit(mx,my);
+  if(n){selected=(selected===n.id?null:n.id); animTo(n.hx,n.hy);}
+  else draw();
+});
+canvas.addEventListener('mouseleave',()=>{dragOn=false;tip.style.opacity='0';hovered=null;draw();});
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  zoom*=e.deltaY>0?0.92:1.08;
+  zoom=Math.max(0.3,Math.min(3.5,zoom));
+  R=W*0.44*zoom; draw();
+},{passive:false});
+canvas.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];const r=canvas.getBoundingClientRect();lmx=t.clientX-r.left;lmy=t.clientY-r.top;dragOn=true;},{passive:false});
+canvas.addEventListener('touchmove',e=>{e.preventDefault();const t=e.touches[0];const r=canvas.getBoundingClientRect();const mx=t.clientX-r.left,my=t.clientY-r.top;if(dragOn){const dx=(mx-lmx)/R*0.72,dy=(my-lmy)/R*0.72;const[nx,ny]=mob(-dx,-dy,cx,cy);const l=Math.hypot(nx,ny);cx=nx/Math.max(1,l/0.93);cy=ny/Math.max(1,l/0.93);lmx=mx;lmy=my;draw();}},{passive:false});
+canvas.addEventListener('touchend',()=>{dragOn=false;});
+window.addEventListener('resize',()=>{setSize();R=W*0.44*zoom;draw();});
+
+setSize(); draw();
+})();
+</script>
+</body>
+</html>

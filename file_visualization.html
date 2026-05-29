@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>File Tree — Four Hyperbolic Models</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: sans-serif; background: #ffffff; padding: 8px; overflow: hidden; }
+#tab-bar {
+  display: flex; flex-wrap: wrap; max-width: 700px;
+  margin: 0 auto; border-bottom: 1px solid #ccc; gap: 2px;
+}
+.tab-btn {
+  padding: 8px 16px; font-size: 13px; font-family: sans-serif;
+  cursor: pointer; background: none; border: none;
+  border-bottom: 2px solid transparent; color: #666;
+  transition: color .15s, border-color .15s;
+}
+.tab-btn:hover { color: #222; }
+.tab-btn.active { color: #222; border-bottom-color: #534AB7; font-weight: 600; }
+#canvas-wrap { position: relative; width: 100%; max-width: 700px; margin: 0 auto; }
+#main-canvas { display: block; width: 100%; border-radius: 12px; touch-action: none; }
+#tip {
+  position: absolute; pointer-events: none; opacity: 0;
+  background: #fff; border: 0.5px solid #ccc; border-radius: 8px;
+  padding: 6px 10px; font-size: 12px; color: #222;
+  transition: opacity .12s; white-space: nowrap; z-index: 9;
+}
+#model-info {
+  max-width: 700px; margin: 6px auto 0;
+  font-size: 12px; color: #888; min-height: 1.6em; line-height: 1.5;
+}
+</style>
+</head>
+<body>
+<div id="tab-bar">
+  <button class="tab-btn active" data-model="poincare">Poincaré disk</button>
+  <button class="tab-btn"        data-model="klein">Klein disk</button>
+  <button class="tab-btn"        data-model="halfplane">Upper half-plane</button>
+  <button class="tab-btn"        data-model="hyperboloid">Hyperboloid</button>
+</div>
+<div id="canvas-wrap">
+  <canvas id="main-canvas"></canvas>
+  <div id="tip"></div>
+</div>
+
+<script>
+(function(){
+
+/* ═══════════════════════════════════════════════════════════════════
+   COLOURS
+═══════════════════════════════════════════════════════════════════ */
+const COLORS = {
+  folder:     { fill:'#534AB7', stroke:'#AFA9EC' },
+  code:       { fill:'#3B6D11', stroke:'#97C459' },
+  image:      { fill:'#993556', stroke:'#ED93B1' },
+  pdf:        { fill:'#993C1D', stroke:'#F0997B' },
+  spreadsheet:{ fill:'#0F6E56', stroke:'#5DCAA5' },
+  config:     { fill:'#5F5E5A', stroke:'#B4B2A9' },
+  text:       { fill:'#444441', stroke:'#B4B2A9' },
+  audio:      { fill:'#854F0B', stroke:'#EF9F27' },
+  video:      { fill:'#854F0B', stroke:'#F9CB42' },
+  binary:     { fill:'#2C2C2A', stroke:'#888780' },
+  archive:    { fill:'#A32D2D', stroke:'#F09595' },
+  data:       { fill:'#185FA5', stroke:'#85B7EB' },
+  markdown:   { fill:'#185FA5', stroke:'#B5D4F4' },
+};
+function col(t){ return COLORS[t]||{fill:'#888780',stroke:'#ccc'}; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   TREE DATA
+═══════════════════════════════════════════════════════════════════ */
+const TREE={id:'root',name:'/',type:'folder',ch:[
+  {id:'home',name:'home',type:'folder',ch:[
+    {id:'alice',name:'alice',type:'folder',ch:[
+      {id:'adocs',name:'Documents',type:'folder',ch:[
+        {id:'resume',name:'resume.pdf',type:'pdf'},
+        {id:'taxes',name:'taxes_2024.xlsx',type:'spreadsheet'},
+        {id:'notes',name:'meeting_notes.md',type:'markdown'},
+        {id:'thesis',name:'thesis_draft.docx',type:'pdf'},
+      ]},
+      {id:'apics',name:'Pictures',type:'folder',ch:[
+        {id:'vacation',name:'vacation_2024',type:'folder',ch:[
+          {id:'img1',name:'beach.jpg',type:'image'},
+          {id:'img2',name:'sunset.jpg',type:'image'},
+          {id:'img3',name:'mountains.jpg',type:'image'},
+        ]},
+        {id:'profile',name:'profile.png',type:'image'},
+      ]},
+      {id:'acode',name:'Projects',type:'folder',ch:[
+        {id:'portfolio',name:'portfolio',type:'folder',ch:[
+          {id:'indexhtml',name:'index.html',type:'code'},
+          {id:'stylecss',name:'style.css',type:'code'},
+          {id:'mainjs',name:'main.js',type:'code'},
+        ]},
+        {id:'mlmodel',name:'ml-model',type:'folder',ch:[
+          {id:'trainpy',name:'train.py',type:'code'},
+          {id:'dataset',name:'dataset.csv',type:'data'},
+          {id:'modelpkl',name:'model.pkl',type:'binary'},
+        ]},
+      ]},
+      {id:'amusic',name:'Music',type:'folder',ch:[
+        {id:'mp1',name:'chill.mp3',type:'audio'},
+        {id:'mp2',name:'focus.mp3',type:'audio'},
+      ]},
+    ]},
+    {id:'bob',name:'bob',type:'folder',ch:[
+      {id:'bdocs',name:'Documents',type:'folder',ch:[
+        {id:'breport',name:'Q3_report.pdf',type:'pdf'},
+        {id:'bbudget',name:'budget.xlsx',type:'spreadsheet'},
+      ]},
+      {id:'bdl',name:'Downloads',type:'folder',ch:[
+        {id:'setup',name:'setup.exe',type:'binary'},
+        {id:'arch',name:'archive.zip',type:'archive'},
+        {id:'movie',name:'movie.mp4',type:'video'},
+      ]},
+    ]},
+  ]},
+  {id:'etc',name:'etc',type:'folder',ch:[
+    {id:'nginx',name:'nginx',type:'folder',ch:[
+      {id:'nginxconf',name:'nginx.conf',type:'config'},
+      {id:'sites',name:'sites-enabled',type:'folder',ch:[
+        {id:'defconf',name:'default',type:'config'},
+        {id:'appconf',name:'app.conf',type:'config'},
+      ]},
+    ]},
+    {id:'ssh',name:'ssh',type:'folder',ch:[
+      {id:'sshd',name:'sshd_config',type:'config'},
+      {id:'known',name:'known_hosts',type:'text'},
+    ]},
+    {id:'hosts',name:'hosts',type:'config'},
+    {id:'fstab',name:'fstab',type:'config'},
+  ]},
+  {id:'var',name:'var',type:'folder',ch:[
+    {id:'log',name:'log',type:'folder',ch:[
+      {id:'syslog',name:'syslog',type:'text'},
+      {id:'authlog',name:'auth.log',type:'text'},
+      {id:'applog',name:'app.log',type:'text'},
+      {id:'nginxlog',name:'nginx',type:'folder',ch:[
+        {id:'access',name:'access.log',type:'text'},
+        {id:'errlog',name:'error.log',type:'text'},
+      ]},
+    ]},
+    {id:'www',name:'www',type:'folder',ch:[
+      {id:'html',name:'html',type:'folder',ch:[
+        {id:'wihtml',name:'index.html',type:'code'},
+        {id:'about',name:'about.html',type:'code'},
+        {id:'assets',name:'assets',type:'folder',ch:[
+          {id:'logo',name:'logo.svg',type:'image'},
+          {id:'appjs',name:'app.js',type:'code'},
+        ]},
+      ]},
+    ]},
+  ]},
+  {id:'usr',name:'usr',type:'folder',ch:[
+    {id:'bin',name:'bin',type:'folder',ch:[
+      {id:'python3',name:'python3',type:'binary'},
+      {id:'node',name:'node',type:'binary'},
+      {id:'git',name:'git',type:'binary'},
+    ]},
+    {id:'local',name:'local',type:'folder',ch:[
+      {id:'lbin',name:'bin',type:'folder',ch:[{id:'myapp',name:'myapp',type:'binary'}]},
+      {id:'llib',name:'lib',type:'folder',ch:[{id:'libfoo',name:'libfoo.so',type:'binary'}]},
+    ]},
+  ]},
+  {id:'tmp',name:'tmp',type:'folder',ch:[
+    {id:'t1',name:'session.tmp',type:'text'},
+    {id:'t2',name:'cache.tmp',type:'text'},
+    {id:'t3',name:'upload_123',type:'binary'},
+  ]},
+]};
+
+/* ═══════════════════════════════════════════════════════════════════
+   HYPERBOLIC MATH
+═══════════════════════════════════════════════════════════════════ */
+
+// Möbius automorphism φ_a(z) = (z−a)/(1−conj(a)z)
+// Moves point a to origin, preserves unit disk
+function mob(zx,zy,ax,ay){
+  const nx=zx-ax, ny=zy-ay;
+  const dx=1-ax*zx-ay*zy, dy=ay*zx-ax*zy;
+  const d2=dx*dx+dy*dy;
+  if(d2<1e-14) return [0,0];
+  return [(nx*dx+ny*dy)/d2,(ny*dx-nx*dy)/d2];
+}
+
+// Minkowski inner product for hyperboloid: <P,Q> = PxQx+PyQy−PzQz
+function mink(P,Q){ return P[0]*Q[0]+P[1]*Q[1]-P[2]*Q[2]; }
+
+// Poincaré disk point → hyperboloid point satisfying X²+Y²−Z²=−1, Z>0
+function p2h(px,py){
+  let r2=px*px+py*py; if(r2>=1) r2=0.99999999;
+  const s=1-r2;
+  return [2*px/s, 2*py/s, (1+r2)/s];
+}
+
+// Cayley map: Poincaré disk → upper half-plane  w = i(1+z)/(1−z)
+function diskToHalf(px,py){
+  // num = i(1+z) = i(1+px+i·py) = −py + i(1+px)
+  const nx=-py, ny=1+px;
+  // den = 1−z = (1−px)−i·py
+  const dx=1-px, dy=-py;
+  const d2=dx*dx+dy*dy;
+  if(d2<1e-14) return [0,1e9];
+  return [(nx*dx+ny*dy)/d2,(ny*dx-nx*dy)/d2];
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TREE FLATTEN
+═══════════════════════════════════════════════════════════════════ */
+const nodes=[], edges=[], byId={};
+function flatten(node,parent,depth){
+  const n={id:node.id,name:node.name,type:node.type,depth,
+           children:(node.ch||[]).map(c=>c.id),hx:0,hy:0};
+  nodes.push(n); byId[n.id]=n;
+  if(parent) edges.push([parent,n.id]);
+  (node.ch||[]).forEach(c=>flatten(c,n.id,depth+1));
+}
+flatten(TREE,null,0);
+
+/* ═══════════════════════════════════════════════════════════════════
+   EXACT HYPERBOLIC LAYOUT  (Lamping & Rao / Sarkar weighted wedge)
+
+   Each node owns an angular wedge of the disk. Children share the
+   parent's wedge proportionally to their subtree sizes. Each child
+   is placed at hyperbolic distance DELTA from its parent along the
+   bisector of its own wedge, using a Möbius map to go from the
+   "parent at origin" frame back to global disk coords.
+
+   parentAngle = direction (global) pointing FROM this node TO its parent.
+                 For the root, this is unused (wedge = full 2π).
+   wedge       = total angular sector this subtree may use.
+═══════════════════════════════════════════════════════════════════ */
+const DELTA=1.3; // hyperbolic edge length; tanh(DELTA/2)≈0.575
+
+// Count nodes in subtree rooted at id
+const sz={};
+function subtreeSize(id){
+  if(sz[id]!==undefined) return sz[id];
+  const n=byId[id]; if(!n) return sz[id]=0;
+  sz[id]=1+n.children.reduce((s,cid)=>s+subtreeSize(cid),0);
+  return sz[id];
+}
+nodes.forEach(n=>subtreeSize(n.id));
+
+function doLayout(id, px, py, parentAngle, wedge){
+  const n=byId[id]; if(!n) return;
+  n.hx=px; n.hy=py;
+  const kids=n.children; if(!kids.length) return;
+
+  const totalKidSz=kids.reduce((s,cid)=>s+sz[cid],0);
+  const r=Math.tanh(DELTA/2);
+
+  // Direction away from parent (root: awayAngle = 0, full circle)
+  const awayAngle = parentAngle+Math.PI;
+  let cursor = awayAngle - wedge/2;
+
+  kids.forEach(cid=>{
+    const kidWedge = wedge * (sz[cid]/totalKidSz);
+    const kidAngle = cursor + kidWedge/2;
+    cursor += kidWedge;
+
+    // Place child at (r,kidAngle) in frame where parent is at origin,
+    // then Möbius-translate back: φ_{−p}(localChild) = φ_p inverse
+    const lx=r*Math.cos(kidAngle), ly=r*Math.sin(kidAngle);
+    // φ_{−p}(z) moves −p to origin, i.e. maps frame-origin back to p
+    let [cx,cy]=mob(lx,ly,-px,-py);
+    // Safety clamp — never reach boundary
+    const cl=Math.hypot(cx,cy);
+    if(cl>0.97){cx*=0.97/cl; cy*=0.97/cl;}
+    byId[cid].hx=cx; byId[cid].hy=cy;
+
+    // Child's parentAngle = direction from child back to current node.
+    // In child's local frame (child at origin), parent sits at:
+    const [pbx,pby]=mob(px,py,cx,cy);
+    const backAngle=Math.atan2(pby,pbx);
+
+    // Child's available wedge: it owns kidWedge, but must "spend" a
+    // small amount for the edge back to parent. Give it 95% of kidWedge
+    // but at least π/8 so deep leaves still have room.
+    const childWedge=Math.max(kidWedge*0.94, Math.PI/10);
+    doLayout(cid, cx, cy, backAngle, childWedge);
+  });
+}
+
+// Root at origin, full circle, parentAngle=0 (unused)
+doLayout('root',0,0,0,2*Math.PI);
+
+/* ═══════════════════════════════════════════════════════════════════
+   DOM
+═══════════════════════════════════════════════════════════════════ */
+const canvas=document.getElementById('main-canvas');
+const ctx=canvas.getContext('2d');
+const tip=document.getElementById('tip');
+const DPR=window.devicePixelRatio||1;
+
+const MODEL_INFO={
+  poincare:   'Poincaré disk — conformal; geodesics are circular arcs orthogonal to the boundary. Click a node to centre it. Drag to pan, scroll to zoom.',
+  klein:      'Klein disk — same node positions, geodesics are straight chords. Angles are distorted; the metric is not conformal.',
+  halfplane:  'Upper half-plane — Cayley image of the disk. Geodesics are vertical lines and semicircles centred on the real axis.',
+  hyperboloid:'Hyperboloid model — nodes on X²+Y²−Z²=−1 in Minkowski space ℝ²˒¹. Geodesics are hyperbolic arcs. Drag to rotate, scroll to zoom.',
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════ */
+let W,H,ox,oy;           // canvas logical dimensions + centre
+let model='poincare';
+let hovered=null, selected=null;
+let dragOn=false, lmx=0, lmy=0;
+
+let diskCx=0,diskCy=0,diskZoom=1;   // Poincaré/Klein pan+zoom
+let hpPanX=0,hpScale=1;             // half-plane horizontal pan + zoom
+let rot=[[1,0,0],[0,1,0],[0,0,1]];  // hyperboloid rotation matrix
+let hypZoom=0.78;
+
+/* ═══════════════════════════════════════════════════════════════════
+   MATRIX HELPERS
+═══════════════════════════════════════════════════════════════════ */
+function matMul(A,B){
+  const C=[[0,0,0],[0,0,0],[0,0,0]];
+  for(let i=0;i<3;i++) for(let j=0;j<3;j++)
+    for(let k=0;k<3;k++) C[i][j]+=A[i][k]*B[k][j];
+  return C;
+}
+function rotX(a){const c=Math.cos(a),s=Math.sin(a);return[[1,0,0],[0,c,-s],[0,s,c]];}
+function rotY(a){const c=Math.cos(a),s=Math.sin(a);return[[c,0,s],[0,1,0],[-s,0,c]];}
+function applyRot(M,[x,y,z]){
+  return[M[0][0]*x+M[0][1]*y+M[0][2]*z,
+         M[1][0]*x+M[1][1]*y+M[1][2]*z,
+         M[2][0]*x+M[2][1]*y+M[2][2]*z];
+}
+rot=matMul(rotX(0.40),rotY(0.28));
+
+/* ═══════════════════════════════════════════════════════════════════
+   CANVAS SIZING  (HiDPI-aware)
+═══════════════════════════════════════════════════════════════════ */
+function setSize(){
+  const wrap=document.getElementById('canvas-wrap');
+  // Cap at available height minus tabs/info bar so it fits in an iframe
+  const maxH = Math.min(window.innerHeight - 80, 560);
+  const cssS = Math.min(wrap.offsetWidth||600, maxH);
+  canvas.width=cssS*DPR; canvas.height=cssS*DPR;
+  canvas.style.width=cssS+'px'; canvas.style.height=cssS+'px';
+  W=cssS; H=cssS; ox=W/2; oy=H/2;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PROJECTIONS
+═══════════════════════════════════════════════════════════════════ */
+function diskR(){ return W*0.44*diskZoom; }
+
+// Half-plane: equal x/y scale so semicircular geodesics are true circles
+const HP_XSCALE=95, HP_YSCALE=95, HP_MARGIN=38;
+
+// Real axis is ALWAYS fixed at canvas y = H-HP_MARGIN.
+// hpPanX shifts content horizontally; vertical position is determined
+// purely by scale — the axis never moves.
+const HP_AXIS_Y = () => H - HP_MARGIN;
+
+function halfToCanvas(u,v){
+  if(v<=0) return null;
+  const xs=HP_XSCALE*hpScale, ys=HP_YSCALE*hpScale;
+  return[ox+hpPanX+u*xs, HP_AXIS_Y()-v*ys];
+}
+
+// Hyperboloid perspective projection
+// Camera at (0,0,−CAM_D) looking toward +Z; surface waist at Z=1
+const CAM_D=5.5, Z_SHIFT=1.35;
+function project3d(wx,wy,wz){
+  const dz=wz-Z_SHIFT+CAM_D; if(dz<0.01) return null;
+  const sc=CAM_D/dz;
+  const R3=W*0.5*0.25*hypZoom;
+  return[ox+wx*sc*R3, oy-wy*sc*R3];
+}
+
+// Project a node's hyperbolic coords to canvas for all models
+function projectNode(hx,hy){
+  if(model==='poincare'){
+    const[px,py]=mob(hx,hy,diskCx,diskCy);
+    const R=diskR();
+    return[ox+px*R, oy+py*R];
+  }
+  if(model==='klein'){
+    const[px,py]=mob(hx,hy,diskCx,diskCy);
+    const r2=px*px+py*py;
+    const kx=2*px/(1+r2), ky=2*py/(1+r2);
+    return[ox+kx*diskR(), oy+ky*diskR()];
+  }
+  if(model==='halfplane'){
+    const[px,py]=mob(hx,hy,diskCx,diskCy);
+    const[u,v]=diskToHalf(px,py);
+    return halfToCanvas(u,v);
+  }
+  if(model==='hyperboloid'){
+    const[px,py]=mob(hx,hy,diskCx,diskCy);
+    const[rx,ry,rz]=applyRot(rot,p2h(px,py));
+    return project3d(rx,ry,rz);
+  }
+  return[ox,oy];
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GEODESIC HELPERS
+═══════════════════════════════════════════════════════════════════ */
+
+// Poincaré disk: circular arc orthogonal to boundary
+// Solves for the unique circle through p1,p2 orthogonal to unit circle.
+// System: 2(c·pi) = 1+|pi|²  for i=1,2  →  linear 2×2 for (cx,cy)
+function geodesicArcPoincare(ctx,p1x,p1y,p2x,p2y,ox,oy,R){
+  const cross=p1x*p2y-p1y*p2x;
+  const s1x=ox+p1x*R, s1y=oy+p1y*R;
+  const s2x=ox+p2x*R, s2y=oy+p2y*R;
+  if(Math.abs(cross)<1e-5){
+    ctx.moveTo(s1x,s1y); ctx.lineTo(s2x,s2y);
+    return;
+  }
+  const b1=(1+p1x*p1x+p1y*p1y)/2;
+  const b2=(1+p2x*p2x+p2y*p2y)/2;
+  const det=p1x*p2y-p1y*p2x;
+  const cx=(b1*p2y-b2*p1y)/det;
+  const cy=(p1x*b2-p2x*b1)/det;
+  const Rg=Math.sqrt(Math.max(0,cx*cx+cy*cy-1));
+  const scx=ox+cx*R, scy=oy+cy*R, sRg=Rg*R;
+  const a1=Math.atan2(s1y-scy,s1x-scx);
+  const a2=Math.atan2(s2y-scy,s2x-scx);
+  let da=a2-a1;
+  while(da> Math.PI) da-=2*Math.PI;
+  while(da<-Math.PI) da+=2*Math.PI;
+  ctx.arc(scx,scy,sRg,a1,a1+da,da<0);
+}
+
+// Upper half-plane: vertical line or semicircle centred on real axis.
+// x₀ = ((u1²+v1²)−(u2²+v2²)) / (2(u1−u2)),  r = √((u1−x0)²+v1²)
+// Equal x/y scale guarantees these render as true circles.
+function geodesicArcHalf(ctx,u1,v1,u2,v2){
+  const s1=halfToCanvas(u1,v1), s2=halfToCanvas(u2,v2);
+  if(!s1||!s2) return;
+  if(Math.abs(u1-u2)<1e-5){
+    ctx.moveTo(s1[0],s1[1]); ctx.lineTo(s2[0],s2[1]);
+    return;
+  }
+  const x0=((u1*u1+v1*v1)-(u2*u2+v2*v2))/(2*(u1-u2));
+  const rg=Math.sqrt((u1-x0)*(u1-x0)+v1*v1);
+  const ys=HP_YSCALE*hpScale;
+  const sRg=rg*ys;
+  const scCentre=halfToCanvas(x0,0);
+  if(!scCentre) return;
+  const canvasCx=scCentre[0];
+  // Geodesic semicircle centre is on the real axis, which is fixed at HP_AXIS_Y()
+  const canvasCy=HP_AXIS_Y();
+  const a1=Math.atan2(s1[1]-canvasCy,s1[0]-canvasCx);
+  const a2=Math.atan2(s2[1]-canvasCy,s2[0]-canvasCx);
+  let da=a2-a1;
+  while(da> Math.PI) da-=2*Math.PI;
+  while(da<-Math.PI) da+=2*Math.PI;
+  ctx.arc(canvasCx,canvasCy,sRg,a1,a1+da,da<0);
+}
+
+// Hyperboloid: exact geodesic γ(t) = (sinh((1−t)d)·P + sinh(t·d)·Q)/sinh(d)
+// Minkowski distance d = arccosh(−⟨P,Q⟩_M)
+function geodesicHyperboloid(P,Q,steps){
+  steps=steps||20;
+  const ip=Math.max(1,-mink(P,Q));
+  const d=Math.acosh(ip);
+  if(d<1e-8) return[P,Q];
+  const sd=Math.sinh(d), pts=[];
+  for(let i=0;i<=steps;i++){
+    const t=i/steps;
+    const w1=Math.sinh((1-t)*d)/sd, w2=Math.sinh(t*d)/sd;
+    pts.push([w1*P[0]+w2*Q[0], w1*P[1]+w2*Q[1], w1*P[2]+w2*Q[2]]);
+  }
+  return pts;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   NODE SIZES
+═══════════════════════════════════════════════════════════════════ */
+function nodeR(n){
+  if(n.depth===0) return 12;
+  if(n.depth===1) return 9;
+  if(n.depth===2) return 7;
+  return 5;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HYPERBOLOID WIREFRAME
+═══════════════════════════════════════════════════════════════════ */
+function buildWireframe(){
+  const segs=[];
+  const NMERID=20,NLAT=8,rMax=0.93;
+  for(let li=1;li<=NLAT;li++){
+    const r=(li/NLAT)*rMax,pts=[];
+    for(let i=0;i<=60;i++){
+      const a=(i/60)*2*Math.PI;
+      pts.push(p2h(r*Math.cos(a),r*Math.sin(a)));
+    }
+    segs.push(pts);
+  }
+  for(let mi=0;mi<NMERID;mi++){
+    const a=(mi/NMERID)*2*Math.PI,pts=[];
+    for(let i=0;i<=30;i++){
+      const r=(i/30)*rMax;
+      pts.push(p2h(r*Math.cos(a),r*Math.sin(a)));
+    }
+    segs.push(pts);
+  }
+  return segs;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DRAW DISPATCH
+═══════════════════════════════════════════════════════════════════ */
+function draw(){
+  ctx.save();
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,W,H);
+  if(model==='hyperboloid')    drawHyperboloid();
+  else if(model==='halfplane') drawHalfPlane();
+  else                         drawDisk();
+  ctx.restore();
+}
+
+/* ── Poincaré & Klein ──────────────────────────────────────────── */
+function drawDisk(){
+  const R=diskR();
+
+  // Outer glow / shadow
+  const grd=ctx.createRadialGradient(ox,oy,R*0.7,ox,oy,R*1.15);
+  grd.addColorStop(0,'rgba(83,74,183,0.0)');
+  grd.addColorStop(1,'rgba(83,74,183,0.08)');
+  ctx.beginPath(); ctx.arc(ox,oy,R*1.15,0,2*Math.PI);
+  ctx.fillStyle=grd; ctx.fill();
+
+  // Disk background
+  ctx.beginPath(); ctx.arc(ox,oy,R,0,2*Math.PI);
+  ctx.fillStyle='#f7f8fc'; ctx.fill();
+  ctx.strokeStyle='#c8d0e8'; ctx.lineWidth=1.5; ctx.stroke();
+
+  ctx.save();
+  ctx.beginPath(); ctx.arc(ox,oy,R,0,2*Math.PI); ctx.clip();
+
+  // Depth rings (purely cosmetic reference)
+  [0.25,0.50,0.75,0.90].forEach(rr=>{
+    ctx.beginPath(); ctx.arc(ox,oy,R*rr,0,2*Math.PI);
+    ctx.strokeStyle='rgba(83,74,183,0.05)'; ctx.lineWidth=0.5; ctx.stroke();
+  });
+
+  // Edges
+  edges.forEach(([aid,bid])=>{
+    const a=byId[aid],b=byId[bid]; if(!a||!b) return;
+    const[apx,apy]=mob(a.hx,a.hy,diskCx,diskCy);
+    const[bpx,bpy]=mob(b.hx,b.hy,diskCx,diskCy);
+    ctx.beginPath();
+    if(model==='poincare'){
+      geodesicArcPoincare(ctx,apx,apy,bpx,bpy,ox,oy,R);
+    } else {
+      // Klein: straight chords in Klein coordinates
+      const r2a=apx*apx+apy*apy, r2b=bpx*bpx+bpy*bpy;
+      const kax=ox+2*apx/(1+r2a)*R, kay=oy+2*apy/(1+r2a)*R;
+      const kbx=ox+2*bpx/(1+r2b)*R, kby=oy+2*bpy/(1+r2b)*R;
+      ctx.moveTo(kax,kay); ctx.lineTo(kbx,kby);
+    }
+    ctx.strokeStyle='rgba(60,58,52,0.20)'; ctx.lineWidth=0.85; ctx.stroke();
+  });
+
+  // Nodes back-to-front by depth
+  [...nodes].sort((a,b)=>b.depth-a.depth).forEach(n=>{
+    const sc=projectNode(n.hx,n.hy); if(!sc) return;
+    const[px,py]=sc;
+    if(Math.hypot(px-ox,py-oy)>R+14) return;
+    drawNode2d(n,px,py);
+  });
+
+  ctx.restore();
+}
+
+/* ── Upper half-plane ──────────────────────────────────────────── */
+function drawHalfPlane(){
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(83,74,183,0.02)'; ctx.fillRect(0,0,W,H);
+
+  // Horocycle lines (constant v = constant imaginary part)
+  // These pan horizontally with hpPanX but are fixed vertically
+  const ys=HP_YSCALE*hpScale;
+  [0.25,0.5,1,2,4,8,16,32,64].forEach(v=>{
+    const sy=HP_AXIS_Y()-v*ys;
+    if(sy<-5||sy>H+5) return;
+    ctx.beginPath(); ctx.moveTo(0,sy); ctx.lineTo(W,sy);
+    ctx.strokeStyle='rgba(83,74,183,0.07)'; ctx.lineWidth=0.5; ctx.stroke();
+    if(sy>12&&sy<H-10){
+      ctx.fillStyle='rgba(83,74,183,0.28)';
+      ctx.font='9px sans-serif'; ctx.textAlign='left';
+      ctx.fillText('v='+v,5,sy-2);
+    }
+  });
+
+  // Real axis — always fixed at bottom
+  const realY=HP_AXIS_Y();
+  ctx.beginPath(); ctx.moveTo(0,realY); ctx.lineTo(W,realY);
+  ctx.strokeStyle='rgba(83,74,183,0.55)'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.fillStyle='rgba(83,74,183,0.06)'; ctx.fillRect(0,realY,W,HP_MARGIN);
+  ctx.fillStyle='rgba(83,74,183,0.45)';
+  ctx.font='10px sans-serif'; ctx.textAlign='left';
+  ctx.fillText('∂ℍ  (real axis, boundary at infinity)',8,H-9);
+
+  // Edges: true geodesic arcs (semicircles / vertical lines)
+  edges.forEach(([aid,bid])=>{
+    const a=byId[aid],b=byId[bid]; if(!a||!b) return;
+    const[apx,apy]=mob(a.hx,a.hy,diskCx,diskCy);
+    const[bpx,bpy]=mob(b.hx,b.hy,diskCx,diskCy);
+    const[u1,v1]=diskToHalf(apx,apy);
+    const[u2,v2]=diskToHalf(bpx,bpy);
+    if(v1<=0||v2<=0) return;
+    ctx.beginPath();
+    geodesicArcHalf(ctx,u1,v1,u2,v2);
+    ctx.strokeStyle='rgba(60,58,52,0.22)'; ctx.lineWidth=0.85; ctx.stroke();
+  });
+
+  // Nodes
+  [...nodes].sort((a,b)=>b.depth-a.depth).forEach(n=>{
+    const sc=projectNode(n.hx,n.hy); if(!sc) return;
+    const[px,py]=sc;
+    if(px<-20||px>W+20||py<-20||py>H+20) return;
+    drawNode2d(n,px,py);
+  });
+}
+
+/* ── Hyperboloid ───────────────────────────────────────────────── */
+function drawHyperboloid(){
+  ctx.fillStyle='#0e1117'; ctx.fillRect(0,0,W,H);
+
+  // Wireframe
+  const wireSegs=buildWireframe();
+  const rotated=wireSegs.map(seg=>{
+    const rpts=seg.map(p=>applyRot(rot,p));
+    return{rpts,avgZ:rpts.reduce((s,p)=>s+p[2],0)/rpts.length};
+  });
+  rotated.sort((a,b)=>a.avgZ-b.avgZ).forEach(({rpts})=>{
+    ctx.beginPath(); let go=false;
+    rpts.forEach(([rx,ry,rz])=>{
+      const sc=project3d(rx,ry,rz); if(!sc) return;
+      go?ctx.lineTo(sc[0],sc[1]):ctx.moveTo(sc[0],sc[1]); go=true;
+    });
+    ctx.strokeStyle='rgba(120,160,220,0.16)'; ctx.lineWidth=0.55; ctx.stroke();
+  });
+
+  // Collect edges (as geodesic polylines) and nodes, depth-sort, draw
+  const items=[];
+  edges.forEach(([aid,bid])=>{
+    const a=byId[aid],b=byId[bid]; if(!a||!b) return;
+    const[apx,apy]=mob(a.hx,a.hy,diskCx,diskCy);
+    const[bpx,bpy]=mob(b.hx,b.hy,diskCx,diskCy);
+    const P0=p2h(apx,apy), Q0=p2h(bpx,bpy);
+    const gpts=geodesicHyperboloid(P0,Q0,18).map(pt=>applyRot(rot,pt));
+    const midZ=gpts[Math.floor(gpts.length/2)][2];
+    items.push({type:'edge',gpts,midZ});
+  });
+  nodes.forEach(n=>{
+    const[px,py]=mob(n.hx,n.hy,diskCx,diskCy);
+    const[rx,ry,rz]=applyRot(rot,p2h(px,py));
+    items.push({type:'node',n,rx,ry,rz,midZ:rz});
+  });
+  items.sort((a,b)=>a.midZ-b.midZ);
+  items.forEach(item=>{
+    if(item.type==='edge'){
+      ctx.beginPath(); let go=false;
+      item.gpts.forEach(([rx,ry,rz])=>{
+        const sc=project3d(rx,ry,rz); if(!sc) return;
+        go?ctx.lineTo(sc[0],sc[1]):ctx.moveTo(sc[0],sc[1]); go=true;
+      });
+      ctx.strokeStyle='rgba(190,200,225,0.4)'; ctx.lineWidth=0.9; ctx.stroke();
+    } else {
+      const sc=project3d(item.rx,item.ry,item.rz); if(!sc) return;
+      drawNode3d(item.n,sc[0],sc[1],item.rz);
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   NODE DRAWING
+═══════════════════════════════════════════════════════════════════ */
+function drawNode2d(n,px,py){
+  const nr=nodeR(n),c=col(n.type);
+  const sel=selected===n.id,hov=hovered===n.id;
+
+  if(sel){
+    ctx.beginPath(); ctx.arc(px,py,nr+7,0,2*Math.PI);
+    ctx.fillStyle=c.fill+'28'; ctx.fill();
+    ctx.beginPath(); ctx.arc(px,py,nr+4,0,2*Math.PI);
+    ctx.strokeStyle=c.fill+'55'; ctx.lineWidth=1; ctx.stroke();
+  }
+
+  // Shadow
+  ctx.beginPath(); ctx.arc(px+0.5,py+1,nr+(sel?3:hov?1.5:0),0,2*Math.PI);
+  ctx.fillStyle='rgba(0,0,0,0.10)'; ctx.fill();
+
+  // Fill + stroke
+  ctx.beginPath(); ctx.arc(px,py,nr+(sel?3:hov?1.5:0),0,2*Math.PI);
+  ctx.fillStyle=c.fill; ctx.fill();
+  ctx.strokeStyle=hov||sel?'#fff':c.stroke;
+  ctx.lineWidth=hov||sel?1.4:0.7; ctx.stroke();
+
+  drawLabel(n,px,py,nr+(sel?3:hov?1.5:0),'rgba(255,255,255,0.92)','#1a1a18');
+}
+
+function drawNode3d(n,sx,sy,worldZ){
+  const ds=Math.max(0.5,Math.min(1.5,CAM_D/(worldZ-Z_SHIFT+CAM_D)*1.1));
+  const nr=nodeR(n)*ds,c=col(n.type);
+  const sel=selected===n.id,hov=hovered===n.id;
+  if(sel){
+    ctx.beginPath(); ctx.arc(sx,sy,nr+7,0,2*Math.PI);
+    ctx.fillStyle=c.fill+'28'; ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(sx+0.5,sy+0.8,nr+(sel?3:hov?1.5:0),0,2*Math.PI);
+  ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(sx,sy,nr+(sel?3:hov?1.5:0),0,2*Math.PI);
+  ctx.fillStyle=c.fill; ctx.fill();
+  ctx.strokeStyle=hov||sel?'rgba(255,255,255,0.9)':c.stroke;
+  ctx.lineWidth=hov||sel?1.4:0.7; ctx.stroke();
+  drawLabel(n,sx,sy,nr+(sel?3:hov?1.5:0),'rgba(14,17,23,0.88)','#e0e8f4');
+}
+
+function drawLabel(n,px,py,nr,bg,fg){
+  const show=n.depth<=2||hovered===n.id||selected===n.id;
+  if(!show) return;
+  const lbl=n.name.length>16?n.name.slice(0,15)+'…':n.name;
+  const fs=Math.max(8,Math.min(10.5,nr*1.05));
+  ctx.font=`${n.depth<=1?600:400} ${fs}px sans-serif`;
+  ctx.textAlign='center';
+  const tw=ctx.measureText(lbl).width;
+  const lx=px,ly=py+nr+2;
+  ctx.fillStyle=bg;
+  ctx.beginPath(); ctx.roundRect(lx-tw/2-3,ly,tw+6,fs+4,3); ctx.fill();
+  ctx.fillStyle=fg; ctx.fillText(lbl,lx,ly+fs+0.5);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HIT TEST
+═══════════════════════════════════════════════════════════════════ */
+function hit(mx,my){
+  let best=null,bd=Infinity;
+  nodes.forEach(n=>{
+    const sc=projectNode(n.hx,n.hy); if(!sc) return;
+    const d=Math.hypot(sc[0]-mx,sc[1]-my);
+    if(d<nodeR(n)+8&&d<bd){bd=d;best=n;}
+  });
+  return best;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATED MÖBIUS PAN  (disk models + half-plane)
+═══════════════════════════════════════════════════════════════════ */
+function animTo(tx,ty){
+  const sx=diskCx,sy=diskCy; let step=0;
+  const iv=setInterval(()=>{
+    step++;
+    const t=step/24,e=t<0.5?2*t*t:-2*t*t+4*t-1;
+    diskCx=sx+(tx-sx)*e; diskCy=sy+(ty-sy)*e;
+    const l=Math.hypot(diskCx,diskCy);
+    if(l>0.92){diskCx*=0.92/l;diskCy*=0.92/l;}
+    draw();
+    if(step>=24)clearInterval(iv);
+  },16);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INPUT HANDLERS
+═══════════════════════════════════════════════════════════════════ */
+function getPos(e){
+  const r=canvas.getBoundingClientRect();
+  return[e.clientX-r.left,e.clientY-r.top];
+}
+function getTPos(e){
+  const r=canvas.getBoundingClientRect(),t=e.touches[0];
+  return[t.clientX-r.left,t.clientY-r.top];
+}
+
+canvas.addEventListener('mousedown',e=>{
+  dragOn=true; canvas.style.cursor='grabbing';
+  [lmx,lmy]=getPos(e);
+});
+
+canvas.addEventListener('mousemove',e=>{
+  const[mx,my]=getPos(e);
+  if(dragOn){
+    const dx=mx-lmx,dy=my-lmy;
+    if(model==='hyperboloid'){
+      rot=matMul(rotX(-dy*0.007),matMul(rotY(dx*0.007),rot));
+    } else if(model==='halfplane'){
+      hpPanX+=dx; // vertical pan disabled — axis is fixed
+    } else {
+      const R=diskR();
+      const[nx,ny]=mob(-dx/R*0.72,-dy/R*0.72,diskCx,diskCy);
+      const l=Math.hypot(nx,ny);
+      diskCx=nx/Math.max(1,l/0.92); diskCy=ny/Math.max(1,l/0.92);
+    }
+    lmx=mx;lmy=my; draw();
+  } else {
+    const n=hit(mx,my);
+    const prev=hovered; hovered=n?n.id:null;
+    if(hovered!==prev) draw();
+    if(n){
+      canvas.style.cursor='pointer';
+      tip.innerHTML=`<b>${n.name}</b><br><span style="color:#888;font-size:11px">${n.type}${n.children.length?' · '+n.children.length+' items':''}</span>`;
+      tip.style.left=(mx+14)+'px'; tip.style.top=(my-8)+'px'; tip.style.opacity='1';
+    } else {
+      canvas.style.cursor='grab'; tip.style.opacity='0';
+    }
+  }
+});
+
+canvas.addEventListener('mouseup',e=>{
+  dragOn=false; canvas.style.cursor='grab';
+  const[mx,my]=getPos(e);
+  const n=hit(mx,my);
+  if(n){
+    selected=selected===n.id?null:n.id;
+    if(model==='poincare'||model==='klein') animTo(n.hx,n.hy);
+    else draw();
+  } else draw();
+});
+
+canvas.addEventListener('mouseleave',()=>{
+  dragOn=false; tip.style.opacity='0'; hovered=null; draw();
+});
+
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const f=e.deltaY>0?0.92:1.08;
+  if(model==='halfplane')    hpScale =Math.max(0.08,Math.min(10,hpScale*f));
+  else if(model==='hyperboloid') hypZoom=Math.max(0.2,Math.min(4,hypZoom*f));
+  else diskZoom=Math.max(0.25,Math.min(5,diskZoom*f));
+  draw();
+},{passive:false});
+
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault(); dragOn=true; [lmx,lmy]=getTPos(e);
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  const[mx,my]=getTPos(e);
+  if(dragOn){
+    const dx=mx-lmx,dy=my-lmy;
+    if(model==='hyperboloid')rot=matMul(rotX(-dy*0.007),matMul(rotY(dx*0.007),rot));
+    else if(model==='halfplane'){hpPanX+=dx;}
+    else{
+      const R=diskR();
+      const[nx,ny]=mob(-dx/R*0.72,-dy/R*0.72,diskCx,diskCy);
+      const l=Math.hypot(nx,ny);
+      diskCx=nx/Math.max(1,l/0.92);diskCy=ny/Math.max(1,l/0.92);
+    }
+    lmx=mx;lmy=my;draw();
+  }
+},{passive:false});
+canvas.addEventListener('touchend',()=>{dragOn=false;});
+
+/* ═══════════════════════════════════════════════════════════════════
+   TAB SWITCHING
+═══════════════════════════════════════════════════════════════════ */
+function resetState(){
+  diskCx=0;diskCy=0;diskZoom=1;
+  hpPanX=0;hpScale=1;
+  hypZoom=0.78;
+  rot=matMul(rotX(0.40),rotY(0.28));
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    model=btn.dataset.model;
+    resetState();
+    draw();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════ */
+window.addEventListener('resize',()=>{setSize();draw();});
+setSize();
+resetState();
+draw();
+
+})();
+</script>
+</body>
+</html>
