@@ -240,6 +240,65 @@ em { font-style: italic; }
 
 .dot:hover::before { opacity: 1; }
 
+/* ── Comparison table ───────────────────────────────── */
+.table-wrap {
+  overflow-x: auto;
+  margin: 1.4rem 0;
+}
+ 
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1.05rem;
+  background: #fff;
+}
+ 
+thead tr {
+  background: #2a5298;
+  color: #fff;
+}
+thead th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  border: none;
+}
+thead th:first-child { border-radius: 8px 0 0 0; }
+thead th:last-child  { border-radius: 0 8px 0 0; }
+ 
+tbody tr:nth-child(odd)  { background: #f7f9fd; }
+tbody tr:nth-child(even) { background: #ffffff; }
+ 
+tbody tr:last-child td:first-child { border-radius: 0 0 0 8px; }
+tbody tr:last-child td:last-child  { border-radius: 0 0 8px 0; }
+ 
+td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+  vertical-align: top;
+  font-size: 1rem;
+  color: #1a1a1a;
+  line-height: 1.55;
+}
+ 
+td:first-child { font-weight: 700; white-space: nowrap; }
+ 
+.tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 1px 7px;
+  border-radius: 4px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.tag-yes  { background: #d4edda; color: #155724; }
+.tag-no   { background: #f8d7da; color: #721c24; }
+.tag-part { background: #fff3cd; color: #856404; }
+
 /* ── Viz containers ───────────────────────────────────── */
 #gerryVizSimple, #d3-simulation {
   min-height: 500px;
@@ -265,7 +324,7 @@ em { font-style: italic; }
 .viz-image {
   width: 100%;
   height: auto;
-  max-height: 400px;
+  max-height: 300px;
   object-fit: contain;
 
   border-radius: 12px;
@@ -366,6 +425,7 @@ em { font-style: italic; }
   <div class="dot" data-tooltip="Alternative Model: Klein"></div>
   <div class="dot" data-tooltip="Alternative Model: Hyperboloid"></div>
   <div class="dot" data-tooltip="Interactive Model Comparison"></div>
+  <div class="dot" data-tooltip="Model Comparisons"></div>
   <div class="dot" data-tooltip="Applications and Challenges"></div>
   <div class="dot" data-tooltip="References"></div>
 </div>
@@ -398,7 +458,7 @@ em { font-style: italic; }
       halves at every level and the layout becomes unreadable before the tree is very deep.
     </p>
     <p>
-      This exponential–polynomial mismatch
+      This exponential-polynomial mismatch
       is the central motivation for using <em>hyperbolic geometry</em>: the hyperbolic plane grows
       exponentially with radius, better matching the growth rate of a tree and guaranteeing
       each subtree its own slice of space. (Wikipedia, n.d.)
@@ -411,7 +471,7 @@ em { font-style: italic; }
   <div class="content">
     <h2>How space grows with radius</h2>
     <p>
-      The key difference between Euclidean and hyperbolic geometry is how much <em>area</em>
+      One important difference between Euclidean and hyperbolic geometry, for our purposes, is how much <em>area</em>
       is enclosed within a circle of radius $r$. In the Euclidean plane, this is the familiar
       $A = \pi r^2$, which is polynomial growth. In the hyperbolic plane, it is:</p>
     <p style="text-align:center; font-size: 1.4rem; margin: 0.5em 0 1em;">
@@ -468,7 +528,7 @@ em { font-style: italic; }
             src="images/hyptreex4.png"
             alt="A multi-view of the Poincaré disk file tree visualization"
             onmouseover="this.title='Infovis Wiki (n.d.)'"
-            class="viz-image">
+            class="viz-image" style="max-width: 600px; margin: 2rem auto; display: block;">
             <p>A multi-view of Lamping and Rao's hyperbolic tree browser (Infovis Wiki, n.d.). This visualization shows the same 
               file system from multiple perspectives, highlighting the unique properties of hyperbolic geometry.
             </p>
@@ -479,7 +539,7 @@ em { font-style: italic; }
   <section class="section s5" data-index="4">
     <div class="content">    
     <h2>Interactive Visualizations</h2> <br> 
-    <p>In these interactive visualizations of a tree systems,
+    <p>Now, we consider a modern implementation of these file visualization systems. In these interactive visualizations of a tree systems,
         you can see how the interactive Poincaré disk allows us to maintain a clear view of the tree's structure even as we navigate through its growing branches.
         (These models actually take some liberties with the strict mathematical definitions to prioritize usability and visual appeal. Later, we will
         see more accurate implementations.)</p>
@@ -513,8 +573,7 @@ em { font-style: italic; }
       Navigation in the Poincaré disk is not performed with ordinary Euclidean
       translations. Moving a subtree toward the center must preserve the
       hyperbolic metric and keep geodesics orthogonal to the disk boundary.
-      The correct transformations are therefore Möbius transformations:
-      conformal automorphisms of the unit disk.
+      The correct transformations are therefore Möbius transformations!
     </p>
 
     <p>
@@ -559,6 +618,7 @@ em { font-style: italic; }
       <h2>Alternative Model: The Klein Disk Model</h2>
 
     <p>
+      Now, we begin to consider some alternative (but less common) models of hyperbolic geometry.<br>
       The Klein disk is another representation of hyperbolic geometry.
       Unlike the Poincaré disk, geodesics appear as straight Euclidean
       line segments instead of circular arcs.
@@ -667,10 +727,90 @@ em { font-style: italic; }
     title="Interactive comparison of hyperbolic models"
     style="width:100%; height:580px; border:none; border-radius:14px; box-shadow:0 6px 18px rgba(0,0,0,0.15);">
   </iframe>
+    <p>In general, with this example, you can see why the Poincaré disk is often preferred for interactive visualization.
+      The Klein disk's straight-line geodesics are visually appealing, but the angle distortion and less intuitive navigation make it less user-friendly. 
+      The hyperboloid model is elegant and free of edge distortion, but its 3D embedding can be difficult to render effectively on a 2D screen and may require more complex interactions to navigate.
+    </p>
   </div>
 </section>
 
-  <section class="section s10" data-index="9">
+<section class="section s10" data-index="9">
+  <div class="content">
+    <h2>Model Comparisons</h2>
+    <p style="font-size:1.1rem; margin-bottom:1.2rem;">
+      All models below represent the same hyperbolic plane $\mathbb{H}^2$.
+      Each takes a Poincaré disk point $z = x + iy \in \mathbb{D}$,
+      with Euclidean radius $r = |z|$ and hyperbolic radius
+      $R = 2\,\mathrm{arctanh}(r)$, as input.
+    </p>
+    <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Projection analogue</th>
+          <th>Defining property</th>
+          <th>Geodesics</th>
+          <th>Conformal<br><span style="font-weight:400;font-size:0.85em">(angle-preserving)</span></th>
+          <th>Area Does Not Appear Distorted</th>
+          <th>Map from Poincaré $z \in \mathbb{D}$</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <tr>
+          <td>Poincaré disk</td>
+          <td>Stereographic</td>
+          <td>Conformal; perspective from boundary point $(0,0,-1)$ of hyperboloid</td>
+          <td>Circular arcs orthogonal to disk</td>
+          <td><span class="tag tag-yes">Yes</span></td>
+          <td><span class="tag tag-no">No</span></td>
+          <td>$z \mapsto z$
+          </td>
+        </tr>
+
+        <tr>
+          <td>Beltrami–Klein disk</td>
+          <td>Gnomonic</td>
+          <td>Geodesics are straight chords; perspective from centre of hyperboloid</td>
+          <td>Euclidean line segments</td>
+          <td><span class="tag tag-no">No</span></td>
+          <td><span class="tag tag-no">No</span></td>
+          <td>$z \mapsto \dfrac{2z}{1+|z|^2}$
+          </td>
+        </tr>
+
+        <tr>
+          <td>Upper half-plane</td>
+          <td>Mercator</td>
+          <td>Conformal; Cayley map sends unit circle to the real axis</td>
+          <td>Vertical lines and semicircles centred on $\mathbb{R}$</td>
+          <td><span class="tag tag-yes">Yes</span></td>
+          <td><span class="tag tag-no">No</span></td>
+          <td>$z \;\mapsto\; w = i\,\dfrac{1+z}{1-z}$
+          </td>
+        </tr>
+
+        <tr>
+          <td>Hyperboloid<br><span style="font-weight:400">(Minkowski)</span></td>
+          <td>-</td>
+          <td>Embedding in 3D space where areas that appear equal are Euclidean equal</td>
+          <td>Intersections of $X^2\!+\!Y^2\!-\!Z^2\!=\!-1$ with planes through origin</td>
+          <td><span class="tag tag-yes">Yes</span></td>
+          <td><span class="tag tag-yes">Yes</span></td>
+          <td>$z \;\mapsto\; \dfrac{1}{1-|z|^2}\!\begin{pmatrix}2x \\ 2y \\ 1+|z|^2\end{pmatrix}$
+          </td>
+        </tr>
+
+      </tbody>
+    </table>
+    <p>
+    <em>(Miller, 2022; Wikipedia, n.d.; Infovis Wiki, n.d.)</em>
+    <br>Of course, other models exist and may be more suitable for specific applications, such as the Gans model or the Lambert azimuthal equal-area model.</p>
+  </div>
+  </div>
+</section>
+  <section class="section s11" data-index="10">
     <div class="content">
 
       <h2>Applications of Hyperbolic Visualization</h2>
@@ -715,7 +855,7 @@ em { font-style: italic; }
   </section>
 
 
-  <section class="section s11" data-index="10">
+  <section class="section s12" data-index="11">
     <div class="content">
       <h2>References<br></h2>
       <ul>
@@ -748,7 +888,7 @@ em { font-style: italic; }
 
 <!-- ADD SCRIPTS HERE -->
 <script type="module" src="euclideanTree.js"></script>
-<script type="module" src="areaGrowth.js"></script>
+<script type="module" src="Areagrowth.js"></script>
 
 <script>
   const sections = document.querySelectorAll(".section");
